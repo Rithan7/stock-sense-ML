@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Login — StockSenseML</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+*{margin:0;padding:0;box-sizing:border-box;}
+:root{--bg:#0d1117;--card:#161b22;--card2:#1c2128;--border:#30363d;--blue:#4fc3f7;--green:#56d364;--red:#f85149;--muted:#8b949e;--white:#e6edf3;}
+body{background:var(--bg);color:var(--white);font-family:'DM Sans',sans-serif;min-height:100vh;display:flex;flex-direction:column;}
+.bg-gradient{position:fixed;inset:0;z-index:0;background:radial-gradient(ellipse at 20% 20%,rgba(79,195,247,0.06) 0%,transparent 60%),radial-gradient(ellipse at 80% 80%,rgba(86,211,100,0.04) 0%,transparent 60%),var(--bg);}
+.navbar{background:rgba(22,27,34,0.95);backdrop-filter:blur(12px);border-bottom:1px solid var(--border);padding:0 28px;display:flex;align-items:center;gap:14px;height:58px;position:relative;z-index:10;}
+.nav-brand{font-family:'Space Mono',monospace;font-size:15px;font-weight:700;color:var(--blue);}
+.nav-right{margin-left:auto;display:flex;gap:10px;}
+.nav-btn{padding:6px 14px;border-radius:7px;font-size:12px;font-weight:600;cursor:pointer;text-decoration:none;transition:all .2s;border:1px solid var(--border);color:var(--muted);}
+.nav-btn:hover{border-color:var(--blue);color:var(--blue);}
+.page-wrap{flex:1;display:flex;align-items:center;justify-content:center;padding:40px 20px;position:relative;z-index:1;}
+.login-card{background:rgba(255,255,255,0.05);backdrop-filter:blur(10px);border:1px solid rgba(255,255,255,0.1);border-radius:20px;padding:40px;width:100%;max-width:420px;box-shadow:0 24px 80px rgba(0,0,0,0.4);animation:cardIn .5s cubic-bezier(.22,.61,.36,1) both;}
+@keyframes cardIn{from{opacity:0;transform:translateY(24px) scale(.97);}to{opacity:1;transform:translateY(0) scale(1);}}
+.card-logo{text-align:center;margin-bottom:28px;}
+.card-logo-icon{font-size:40px;display:block;margin-bottom:8px;}
+.card-logo-brand{font-family:'Space Mono',monospace;font-size:18px;font-weight:700;color:var(--blue);}
+.card-logo-sub{font-size:12px;color:var(--muted);margin-top:4px;}
+.card-title{font-size:20px;font-weight:700;margin-bottom:6px;text-align:center;}
+.card-desc{font-size:13px;color:var(--muted);text-align:center;margin-bottom:28px;}
+.flash{padding:10px 14px;border-radius:8px;font-size:13px;margin-bottom:18px;}
+.flash-error{background:rgba(248,81,73,.12);border:1px solid rgba(248,81,73,.3);color:#f85149;}
+.flash-success{background:rgba(86,211,100,.12);border:1px solid rgba(86,211,100,.3);color:#56d364;}
+.form-group{margin-bottom:18px;}
+.form-label{display:block;font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:7px;}
+.form-input{width:100%;background:rgba(28,33,40,0.8);color:var(--white);border:1px solid var(--border);border-radius:10px;padding:11px 14px;font-size:14px;font-family:'DM Sans',sans-serif;transition:border-color .2s;}
+.form-input:focus{outline:none;border-color:var(--blue);}
+.form-input::placeholder{color:var(--muted);}
+.submit-btn{width:100%;background:var(--blue);color:#0d1117;border:none;border-radius:10px;padding:13px;font-size:14px;font-weight:700;cursor:pointer;font-family:'DM Sans',sans-serif;transition:all .2s;margin-top:6px;}
+.submit-btn:hover{opacity:.85;transform:translateY(-1px);}
+.card-footer{text-align:center;margin-top:22px;font-size:13px;color:var(--muted);}
+.card-footer a{color:var(--blue);text-decoration:none;font-weight:600;}
+footer{border-top:1px solid var(--border);padding:14px 28px;text-align:center;font-size:11px;color:var(--muted);position:relative;z-index:1;}
+</style>
+</head>
+<body>
+<div class="bg-gradient"></div>
+<nav class="navbar">
+  <span style="font-size:20px;">📈</span>
+  <div class="nav-brand">StockSenseML</div>
+  <div class="nav-right">
+    <a href="/" class="nav-btn">← Home</a>
+    <a href="/search" class="nav-btn">🔍 Search</a>
+    <a href="/register" class="nav-btn">Register</a>
+  </div>
+</nav>
+<div class="page-wrap">
+  <div class="login-card">
+    <div class="card-logo">
+      <span class="card-logo-icon">📈</span>
+      <div class="card-logo-brand">StockSenseML</div>
+      <div class="card-logo-sub">ML-Powered Stock Movement Classifier</div>
+    </div>
+    <div class="card-title">Welcome back</div>
+    <div class="card-desc">Sign in to your account to continue</div>
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% for category, message in messages %}
+        <div class="flash flash-{{ category }}">{{ message }}</div>
+      {% endfor %}
+    {% endwith %}
+    <form method="POST" action="/login">
+      <div class="form-group">
+        <label class="form-label" for="username">Username</label>
+        <input class="form-input" type="text" id="username" name="username" placeholder="Enter your username" required autocomplete="username">
+      </div>
+      <div class="form-group">
+        <label class="form-label" for="password">Password</label>
+        <input class="form-input" type="password" id="password" name="password" placeholder="Enter your password" required autocomplete="current-password">
+      </div>
+      <button class="submit-btn" type="submit">Sign In →</button>
+    </form>
+    <div class="card-footer">Don't have an account? <a href="/register">Create one</a></div>
+  </div>
+</div>
+<footer>StockSenseML · Academic use only · Not financial advice</footer>
+</body>
+</html>
