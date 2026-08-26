@@ -1,6 +1,5 @@
 # 📈 Stock Market Classifier & Analytics Platform (`StockSenseML`)
 
-[![Live Demo](https://img.shields.io/badge/🚀_Live_Demo-Click_Here-brightgreen?style=for-the-badge&logo=vercel&logoColor=white)](https://rithan7.github.io/stock-sense-ML/)
 [![GitHub Repository](https://img.shields.io/badge/GitHub-Repository-181717?style=for-the-badge&logo=github&logoColor=white)](https://github.com/Rithan7/stock-sense-ML)
 [![Python](https://img.shields.io/badge/Python-3.9%2B-3776AB?style=for-the-badge&logo=python&logoColor=white)](https://www.python.org/)
 [![Flask](https://img.shields.io/badge/Flask-3.0.0-000000?style=for-the-badge&logo=flask&logoColor=white)](https://flask.palletsprojects.com/)
@@ -8,27 +7,17 @@
 [![Plotly](https://img.shields.io/badge/Plotly-5.18.0-3F4F75?style=for-the-badge&logo=plotly&logoColor=white)](https://plotly.com/)
 [![License](https://img.shields.io/badge/License-MIT-green?style=for-the-badge)](LICENSE)
 
-An end-to-end Machine Learning web application built with **Flask**, **yfinance**, **Scikit-Learn**, and **Plotly** to predict stock market directional movement (Up vs. Down) using 14+ technical indicators, quantitative feature engineering, and interactive analytics dashboards.
-
----
-
-## 🌐 Live Demo
-
-Experience the live interactive application directly in your web browser:
-
-👉 **[Launch StockSenseML Live Demo](https://rithan7.github.io/stock-sense-ML/)**
-
-> **Note**: You can test stock directional predictions for major tickers like **AAPL**, **NVDA**, **TSLA**, **MSFT**, and **GOOGL**, experiment with Random Forest vs. Logistic Regression models, inspect confusion matrices and ROC curves, and search custom tickers live!
+An end-to-end Machine Learning web application built with **Flask**, **yfinance**, **Scikit-Learn**, and **Plotly** to predict stock market directional movement (Up vs. Down) using 14 quantitative technical indicators, rigorous feature engineering, and interactive analytics dashboards.
 
 ---
 
 ## ✨ Features & Capabilities
 
-- 🔍 **Real-Time Market Data Ingestion**: Seamless integration with `yfinance` to fetch OHLCV (Open, High, Low, Close, Volume) stock price history.
-- 📊 **14+ Quantitative Technical Indicators**:
-  - **Moving Averages**: 5-day (MA5), 10-day (MA10), 20-day (MA20), and MA Crossover Signals.
+- 🔍 **Real-Time Market Data Ingestion**: Integration with `yfinance` to fetch OHLCV (Open, High, Low, Close, Volume) historical prices.
+- 📊 **14 Quantitative Technical Indicators**:
+  - **Moving Averages**: 5-day (MA5), 10-day (MA10), 20-day (MA20), and MA Crossover Trend Signals.
   - **Momentum & Trend**: Relative Strength Index (RSI 14), Moving Average Convergence Divergence (MACD & Signal Line), 5-day Price Momentum.
-  - **Volatility & Bands**: Bollinger Bands Width & Relative Position, Historical 5-day Volatility, Normalized Price Range.
+  - **Volatility & Bands**: Bollinger Bands Width & Relative Position, Historical 5-day Return Volatility, Normalized Price Range.
 - 🤖 **Dual Machine Learning Classification Algorithms**:
   - **Random Forest Classifier**: Non-linear ensemble model with 100 decision trees and automated Gini feature importance extraction.
   - **Logistic Regression**: Probabilistic linear classifier standardized with `StandardScaler`.
@@ -81,22 +70,82 @@ flowchart LR
 
 ---
 
-## 🔬 Mathematical Feature Engineering
+## 🔬 Mathematical Feature Engineering & Quantitative Modeling
 
-The prediction engine computes 14 distinct quantitative features for binary classification ($Y_{t} = 1$ if $\text{Close}_{t+1} > \text{Close}_{t}$, else $0$):
+The core predictive architecture processes raw daily OHLCV price series $\{P_t, H_t, L_t, O_t, V_t\}$ to construct 14 quantitative features and 1 binary classification target.
 
-1. **Relative Strength Index (RSI 14)**:
-   $$\text{RSI} = 100 - \left( \frac{100}{1 + \frac{\text{EMA}(\text{Gain}, 14)}{\text{EMA}(\text{Loss}, 14)}} \right)$$
+### 1. Binary Target Formulation ($Y_t$)
+The predictive task is framed as next-session directional class estimation:
+$$Y_t = \mathbb{I}(P_{t+1} > P_t) = \begin{cases} 1, & \text{if } P_{t+1} > P_t \quad (\text{Up / Bullish}) \\ 0, & \text{if } P_{t+1} \le P_t \quad (\text{Down / Bearish}) \end{cases}$$
+where $P_t$ denotes the adjusted closing price at daily index $t$, and $\mathbb{I}(\cdot)$ is the indicator function.
 
-2. **MACD Indicator**:
-   $$\text{MACD} = \text{EMA}(\text{Close}, 12) - \text{EMA}(\text{Close}, 26)$$
-   $$\text{MACD Signal} = \text{EMA}(\text{MACD}, 9)$$
+---
 
-3. **Bollinger Bands Position ($\text{BB\_Pos}$)**:
-   $$\text{BB\_Pos} = \frac{\text{Close} - (\text{MA}_{20} - 2\sigma)}{\left(4\sigma + 10^{-9}\right)}$$
+### 2. Complete Technical Feature Definitions
 
-4. **Normalized Price Range**:
-   $$\text{Price Range} = \frac{\text{High} - \text{Low}}{\text{Close}}$$
+#### 1. Daily Percentage Return ($R_t$)
+Quantifies single-period relative price gain or loss:
+$$R_t = \frac{P_t - P_{t-1}}{P_{t-1}}$$
+
+#### 2. Simple Moving Averages ($\text{MA}_{N,t}$)
+Computes unweighted rolling mean over lookback windows $N \in \{5, 10, 20\}$:
+$$\text{MA}_{N,t} = \frac{1}{N} \sum_{i=0}^{N-1} P_{t-i}$$
+
+#### 3. Moving Average Trend Signal ($\text{MA\_Signal}_t$)
+Normalizes short-term (5-day) versus medium-term (10-day) trend alignment relative to current asset price:
+$$\text{MA\_Signal}_t = \frac{\text{MA}_{5,t} - \text{MA}_{10,t}}{P_t}$$
+
+#### 4. Percentage Volume Variation ($\text{Vol\_Change}_t$)
+Measures day-over-day trading volume acceleration:
+$$\text{Vol\_Change}_t = \frac{V_t - V_{t-1}}{V_{t-1}}$$
+
+#### 5. Return Volatility ($\sigma_{5,t}$)
+Calculates rolling 5-day sample standard deviation of percentage returns:
+$$\sigma_{5,t} = \sqrt{\frac{1}{4} \sum_{i=0}^{4} (R_{t-i} - \bar{R}_{5,t})^2}, \quad \text{where } \bar{R}_{5,t} = \frac{1}{5}\sum_{i=0}^{4} R_{t-i}$$
+
+#### 6. Normalized Intraday Price Range ($\text{Price\_Range}_t$)
+Scales intraday high-to-low dispersion relative to closing price:
+$$\text{Price\_Range}_t = \frac{H_t - L_t}{P_t}$$
+
+#### 7. Absolute Price Momentum ($\text{Momentum}_{5,t}$)
+Tracks 5-session directional price displacement:
+$$\text{Momentum}_{5,t} = P_t - P_{t-5}$$
+
+#### 8. Relative Strength Index ($\text{RSI}_{14,t}$)
+Measures momentum velocity and magnitude over a 14-day window:
+$$\Delta P_t = P_t - P_{t-1}$$
+$$\text{Gain}_t = \max(\Delta P_t, 0), \quad \text{Loss}_t = \max(-\Delta P_t, 0)$$
+$$\overline{\text{Gain}}_{14,t} = \frac{1}{14} \sum_{i=0}^{13} \text{Gain}_{t-i}, \quad \overline{\text{Loss}}_{14,t} = \frac{1}{14} \sum_{i=0}^{13} \text{Loss}_{t-i}$$
+$$\text{RS}_{14,t} = \frac{\overline{\text{Gain}}_{14,t}}{\overline{\text{Loss}}_{14,t} + \varepsilon}$$
+$$\text{RSI}_{14,t} = 100 - \left( \frac{100}{1 + \text{RS}_{14,t}} \right)$$
+
+#### 9. Moving Average Convergence Divergence ($\text{MACD}_t$ & $\text{MACD\_Signal}_t$)
+Calculates Exponential Moving Averages (EMA) with smoothing multiplier $\alpha_N = \frac{2}{N+1}$:
+$$\text{EMA}_{N,t} = \alpha_N P_t + (1 - \alpha_N)\text{EMA}_{N,t-1}$$
+$$\text{MACD}_t = \text{EMA}_{12,t} - \text{EMA}_{26,t}$$
+$$\text{MACD\_Signal}_t = \text{EMA}_{9}(\text{MACD})_t$$
+
+#### 10. Bollinger Bands Bandwidth ($\text{BB\_Width}_t$)
+Quantifies price volatility expansion and compression relative to the 20-day baseline $\mu_{20,t}$ and standard deviation $\sigma_{20,t}$:
+$$\text{Upper Band}_t = \mu_{20,t} + 2\sigma_{20,t}, \quad \text{Lower Band}_t = \mu_{20,t} - 2\sigma_{20,t}$$
+$$\text{BB\_Width}_t = \frac{\text{Upper Band}_t - \text{Lower Band}_t}{\mu_{20,t}} = \frac{4\sigma_{20,t}}{\mu_{20,t}}$$
+
+#### 11. Bollinger Bands %B Relative Position ($\text{BB\_Pos}_t$)
+Measures closing price location relative to lower and upper Bollinger envelopes:
+$$\text{BB\_Pos}_t = \frac{P_t - \text{Lower Band}_t}{\text{Upper Band}_t - \text{Lower Band}_t + \varepsilon} = \frac{P_t - (\mu_{20,t} - 2\sigma_{20,t})}{4\sigma_{20,t} + \varepsilon}$$
+
+---
+
+### 3. Data Standardization & Model Optimization
+
+#### Feature Standardization ($\mathbf{z}$)
+To eliminate scale variance between indicators (e.g., RSI $\in [0, 100]$ vs. Returns $\in [-0.1, 0.1]$), features are zero-mean unit-variance transformed:
+$$z_{i,j} = \frac{x_{i,j} - \mu_j}{\sigma_j}$$
+where mean $\mu_j$ and standard deviation $\sigma_j$ are fitted strictly on training observations to prevent data leakage.
+
+#### Decision Threshold Tuning ($t^*$)
+Instead of using a static decision boundary $p=0.5$, optimal classification thresholds $t \in [0.05, 0.95]$ are grid-searched to maximize the $F_1$-score on test predictions:
+$$t^* = \underset{t \in [0.05, 0.95]}{\operatorname{argmax}} \; F_1(t) = \underset{t \in [0.05, 0.95]}{\operatorname{argmax}} \left( \frac{2 \cdot \text{Precision}(t) \cdot \text{Recall}(t)}{\text{Precision}(t) + \text{Recall}(t)} \right)$$
 
 ---
 
@@ -138,7 +187,7 @@ cp .env.example .env
 ```
 *(Optional)* Customize `SECRET_KEY` and `DATABASE_URL` inside `.env`.
 
-### 5. Run the Application locally
+### 5. Run the Application Locally
 ```bash
 python app.py
 ```
