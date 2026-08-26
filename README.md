@@ -1,5 +1,6 @@
 # 📈 Stock Market Classifier & Analytics Platform (`StockSenseML`)
 
+[![GitHub Repository](https://img.shields.io/badge/GitHub-Repository-181717?style=for-the-badge&logo=github&logoColor=white)](https://github.com/Rithan7/stock-sense-ML)
 [![Python](https://img.shields.io/badge/Python-3.9%2B-3776AB?style=for-the-badge&logo=python&logoColor=white)](https://www.python.org/)
 [![Flask](https://img.shields.io/badge/Flask-3.0.0-000000?style=for-the-badge&logo=flask&logoColor=white)](https://flask.palletsprojects.com/)
 [![Scikit-Learn](https://img.shields.io/badge/Scikit--Learn-1.4.0-F7931E?style=for-the-badge&logo=scikit-learn&logoColor=white)](https://scikit-learn.org/)
@@ -7,6 +8,8 @@
 [![License](https://img.shields.io/badge/License-MIT-green.style=for-the-badge)](LICENSE)
 
 An end-to-end Machine Learning web application built with **Flask**, **yfinance**, **Scikit-Learn**, and **Plotly** to predict stock market directional movement (Up vs. Down) using technical indicators, quantitative feature engineering, and interactive analytics dashboards.
+
+🔗 **GitHub Repository**: [https://github.com/Rithan7/stock-sense-ML](https://github.com/Rithan7/stock-sense-ML)
 
 ---
 
