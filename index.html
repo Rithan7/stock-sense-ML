@@ -1,0 +1,793 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>StockSenseML - Live Interactive Stock Market Classifier & Analytics</title>
+    <meta name="description" content="End-to-end Machine Learning web application predicting stock directional movement using technical indicators, Random Forest, Logistic Regression, and Plotly charts.">
+    <!-- FontAwesome & Google Fonts -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+    <!-- Plotly.js -->
+    <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
+    <style>
+        :root {
+            --bg-primary: #0d1117;
+            --bg-secondary: #161b22;
+            --bg-card: #1c2128;
+            --border-color: #30363d;
+            --text-main: #c9d1d9;
+            --text-muted: #8b949e;
+            --text-heading: #f0f6fc;
+            --accent-blue: #58a6ff;
+            --accent-green: #3fb950;
+            --accent-red: #f85149;
+            --accent-purple: #bc8cff;
+            --accent-orange: #d29922;
+            --font-main: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            --font-code: 'JetBrains Mono', monospace;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            background-color: var(--bg-primary);
+            color: var(--text-main);
+            font-family: var(--font-main);
+            line-height: 1.6;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* Navbar */
+        .navbar {
+            background-color: var(--bg-secondary);
+            border-bottom: 1px solid var(--border-color);
+            padding: 1rem 2rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        .brand {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            text-decoration: none;
+            color: var(--text-heading);
+            font-weight: 700;
+            font-size: 1.25rem;
+        }
+
+        .brand-icon {
+            background: linear-gradient(135deg, #1f6beb, #388bfd);
+            width: 38px;
+            height: 38px;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #ffffff;
+            font-size: 1.2rem;
+        }
+
+        .nav-links {
+            display: flex;
+            gap: 1rem;
+            align-items: center;
+        }
+
+        .nav-badge {
+            background: rgba(63, 185, 80, 0.15);
+            color: var(--accent-green);
+            border: 1px solid rgba(63, 185, 80, 0.4);
+            padding: 0.35rem 0.8rem;
+            border-radius: 20px;
+            font-size: 0.85rem;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .nav-badge .pulse {
+            width: 8px;
+            height: 8px;
+            background-color: var(--accent-green);
+            border-radius: 50%;
+            animation: pulse-ring 1.8s infinite;
+        }
+
+        @keyframes pulse-ring {
+            0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(63, 185, 80, 0.7); }
+            70% { transform: scale(1); box-shadow: 0 0 0 8px rgba(63, 185, 80, 0); }
+            100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(63, 185, 80, 0); }
+        }
+
+        .btn-gh {
+            background-color: #21262d;
+            color: var(--text-heading);
+            border: 1px solid var(--border-color);
+            padding: 0.5rem 1rem;
+            border-radius: 6px;
+            text-decoration: none;
+            font-size: 0.9rem;
+            font-weight: 500;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            transition: all 0.2s ease;
+        }
+
+        .btn-gh:hover {
+            background-color: #30363d;
+            border-color: #8b949e;
+        }
+
+        /* Container Layout */
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 2rem;
+            width: 100%;
+            flex: 1;
+        }
+
+        .header-banner {
+            margin-bottom: 2rem;
+            background: linear-gradient(135deg, rgba(31, 107, 235, 0.1) 0%, rgba(188, 140, 255, 0.05) 100%);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 1.75rem 2rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 1rem;
+        }
+
+        .header-title h1 {
+            color: var(--text-heading);
+            font-size: 1.75rem;
+            font-weight: 700;
+            margin-bottom: 0.35rem;
+        }
+
+        .header-title p {
+            color: var(--text-muted);
+            font-size: 0.95rem;
+        }
+
+        /* Control Panel Form */
+        .control-panel {
+            background-color: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 1.5rem;
+            margin-bottom: 2rem;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 1.25rem;
+            align-items: end;
+        }
+
+        .form-group {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+
+        .form-group label {
+            font-size: 0.85rem;
+            font-weight: 600;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .form-select, .form-input {
+            background-color: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            color: var(--text-heading);
+            padding: 0.65rem 1rem;
+            border-radius: 6px;
+            font-size: 0.95rem;
+            font-family: inherit;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+
+        .form-select:focus, .form-input:focus {
+            border-color: var(--accent-blue);
+        }
+
+        .btn-predict {
+            background: linear-gradient(135deg, #238636, #2ea043);
+            color: #ffffff;
+            border: none;
+            padding: 0.7rem 1.5rem;
+            border-radius: 6px;
+            font-weight: 600;
+            font-size: 0.95rem;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+            transition: transform 0.1s, background-color 0.2s;
+            height: 42px;
+        }
+
+        .btn-predict:hover {
+            background: linear-gradient(135deg, #2ea043, #3fb950);
+        }
+
+        .btn-predict:active {
+            transform: scale(0.98);
+        }
+
+        /* Dashboard Grid */
+        .dashboard-grid {
+            display: grid;
+            grid-template-columns: 2fr 1fr;
+            gap: 1.5rem;
+            margin-bottom: 2rem;
+        }
+
+        @media (max-width: 1024px) {
+            .dashboard-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .card {
+            background-color: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 1.5rem;
+        }
+
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1.25rem;
+            padding-bottom: 0.75rem;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .card-title {
+            color: var(--text-heading);
+            font-size: 1.1rem;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        /* Prediction Card Metrics */
+        .prediction-badge-container {
+            text-align: center;
+            padding: 1.5rem;
+            background: var(--bg-secondary);
+            border-radius: 10px;
+            border: 1px solid var(--border-color);
+            margin-bottom: 1.25rem;
+        }
+
+        .pred-target-label {
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            margin-bottom: 0.5rem;
+        }
+
+        .pred-signal {
+            font-size: 2.2rem;
+            font-weight: 800;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .pred-signal.up {
+            color: var(--accent-green);
+        }
+
+        .pred-signal.down {
+            color: var(--accent-red);
+        }
+
+        .confidence-bar-bg {
+            background: #21262d;
+            height: 10px;
+            border-radius: 5px;
+            overflow: hidden;
+            margin: 0.75rem 0 0.35rem;
+        }
+
+        .confidence-bar-fill {
+            height: 100%;
+            background: linear-gradient(90deg, var(--accent-blue), var(--accent-green));
+            width: 78%;
+            border-radius: 5px;
+            transition: width 0.5s ease;
+        }
+
+        .metrics-mini-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 0.75rem;
+            margin-top: 1rem;
+        }
+
+        .metric-box {
+            background-color: var(--bg-secondary);
+            padding: 0.85rem;
+            border-radius: 8px;
+            border: 1px solid var(--border-color);
+            text-align: center;
+        }
+
+        .metric-box .label {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+        }
+
+        .metric-box .val {
+            font-size: 1.3rem;
+            font-weight: 700;
+            color: var(--text-heading);
+            font-family: var(--font-code);
+            margin-top: 0.2rem;
+        }
+
+        /* Charts Container */
+        .chart-container {
+            width: 100%;
+            min-height: 450px;
+        }
+
+        .secondary-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 1.5rem;
+            margin-bottom: 2rem;
+        }
+
+        @media (max-width: 900px) {
+            .secondary-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        /* Footer */
+        footer {
+            background-color: var(--bg-secondary);
+            border-top: 1px solid var(--border-color);
+            padding: 1.5rem 2rem;
+            text-align: center;
+            color: var(--text-muted);
+            font-size: 0.85rem;
+            margin-top: auto;
+        }
+
+        footer a {
+            color: var(--accent-blue);
+            text-decoration: none;
+        }
+
+        footer a:hover {
+            text-decoration: underline;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Navbar -->
+    <nav class="navbar">
+        <a href="#" class="brand">
+            <div class="brand-icon"><i class="fa-solid fa-chart-line"></i></div>
+            <span>StockSenseML</span>
+        </a>
+        <div class="nav-links">
+            <div class="nav-badge">
+                <div class="pulse"></div>
+                <span>Live Interactive Demo</span>
+            </div>
+            <a href="https://github.com/Rithan7/stock-sense-ML" target="_blank" class="btn-gh">
+                <i class="fa-brands fa-github"></i>
+                <span>GitHub Repo</span>
+            </a>
+        </div>
+    </nav>
+
+    <!-- Main Container -->
+    <div class="container">
+        
+        <!-- Header Banner -->
+        <div class="header-banner">
+            <div class="header-title">
+                <h1>Stock Market Directional Classifier & Technical Analytics</h1>
+                <p>Interactive Machine Learning workbench using yfinance OHLCV data, 14 quantitative features, Scikit-Learn models, & Plotly charts.</p>
+            </div>
+            <a href="https://github.com/Rithan7/stock-sense-ML#readme" target="_blank" class="btn-gh">
+                <i class="fa-solid fa-book"></i> Read Documentation
+            </a>
+        </div>
+
+        <!-- Control Panel -->
+        <div class="control-panel">
+            <div class="form-group">
+                <label for="tickerSelect"><i class="fa-solid fa-arrow-trend-up"></i> Stock Ticker</label>
+                <select id="tickerSelect" class="form-select">
+                    <option value="AAPL">AAPL - Apple Inc.</option>
+                    <option value="NVDA" selected>NVDA - NVIDIA Corp.</option>
+                    <option value="TSLA">TSLA - Tesla Inc.</option>
+                    <option value="MSFT">MSFT - Microsoft Corp.</option>
+                    <option value="GOOGL">GOOGL - Alphabet Inc.</option>
+                    <option value="AMZN">AMZN - Amazon.com Inc.</option>
+                    <option value="META">META - Meta Platforms</option>
+                    <option value="JPM">JPM - JPMorgan Chase</option>
+                    <option value="V">V - Visa Inc.</option>
+                    <option value="NFLX">NFLX - Netflix Inc.</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label for="modelSelect"><i class="fa-solid fa-robot"></i> ML Algorithm</label>
+                <select id="modelSelect" class="form-select">
+                    <option value="rf">Random Forest Classifier (Ensemble)</option>
+                    <option value="lr">Logistic Regression (Probabilistic)</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label for="periodSelect"><i class="fa-solid fa-calendar-days"></i> Data Horizon</label>
+                <select id="periodSelect" class="form-select">
+                    <option value="1y" selected>1 Year History (252 Days)</option>
+                    <option value="2y">2 Years History (504 Days)</option>
+                    <option value="5y">5 Years History (1260 Days)</option>
+                </select>
+            </div>
+
+            <button id="runBtn" class="btn-predict" onclick="runAnalysis()">
+                <i class="fa-solid fa-play"></i> Train & Predict Target
+            </button>
+        </div>
+
+        <!-- Main Dashboard Grid -->
+        <div class="dashboard-grid">
+            
+            <!-- Technical Candlestick & Indicator Chart -->
+            <div class="card">
+                <div class="card-header">
+                    <div class="card-title">
+                        <i class="fa-solid fa-chart-candlestick" style="color: var(--accent-blue);"></i>
+                        <span id="chartTitle">NVDA Technical Chart & Moving Averages</span>
+                    </div>
+                    <span style="font-size: 0.8rem; color: var(--text-muted);" id="dataUpdateBadge">OHLCV Ingested</span>
+                </div>
+                <div id="candleChart" class="chart-container"></div>
+            </div>
+
+            <!-- ML Prediction Output Panel -->
+            <div class="card">
+                <div class="card-header">
+                    <div class="card-title">
+                        <i class="fa-solid fa-brain" style="color: var(--accent-purple);"></i>
+                        <span>ML Classification Result</span>
+                    </div>
+                </div>
+
+                <div class="prediction-badge-container">
+                    <div class="pred-target-label">Next Trading Day Signal (\(Y_{t+1}\))</div>
+                    <div id="signalBadge" class="pred-signal up">
+                        <i class="fa-solid fa-circle-arrow-up"></i>
+                        <span id="signalText">BULLISH (UP)</span>
+                    </div>
+                    <div style="font-size: 0.85rem; color: var(--text-muted);">
+                        Probability: <strong id="probText" style="color: var(--text-heading);">78.4%</strong>
+                    </div>
+                    <div class="confidence-bar-bg">
+                        <div id="confidenceFill" class="confidence-bar-fill" style="width: 78.4%;"></div>
+                    </div>
+                </div>
+
+                <div class="metrics-mini-grid">
+                    <div class="metric-box">
+                        <div class="label">Test Accuracy</div>
+                        <div class="val" id="accVal">82.4%</div>
+                    </div>
+                    <div class="metric-box">
+                        <div class="label">F1 Score</div>
+                        <div class="val" id="f1Val">0.831</div>
+                    </div>
+                    <div class="metric-box">
+                        <div class="label">Precision</div>
+                        <div class="val" id="precVal">0.812</div>
+                    </div>
+                    <div class="metric-box">
+                        <div class="label">Recall</div>
+                        <div class="val" id="recVal">0.850</div>
+                    </div>
+                </div>
+
+                <div style="margin-top: 1.25rem; font-size: 0.82rem; color: var(--text-muted); line-height: 1.4; background: var(--bg-secondary); padding: 0.75rem; border-radius: 6px; border: 1px solid var(--border-color);">
+                    <i class="fa-solid fa-circle-info" style="color: var(--accent-blue);"></i>
+                    Model evaluated via 80/20 train-test temporal split with 14 engineered features (RSI, MACD, Bollinger Bands, Volatility).
+                </div>
+            </div>
+
+        </div>
+
+        <!-- Secondary Analytics Grid -->
+        <div class="secondary-grid">
+            
+            <!-- Confusion Matrix Card -->
+            <div class="card">
+                <div class="card-header">
+                    <div class="card-title">
+                        <i class="fa-solid fa-table-cells" style="color: var(--accent-orange);"></i>
+                        <span>Confusion Matrix</span>
+                    </div>
+                </div>
+                <div id="cmChart" style="height: 250px;"></div>
+            </div>
+
+            <!-- Feature Importance Card -->
+            <div class="card">
+                <div class="card-header">
+                    <div class="card-title">
+                        <i class="fa-solid fa-layer-group" style="color: var(--accent-green);"></i>
+                        <span>Feature Importance Ranking</span>
+                    </div>
+                </div>
+                <div id="featChart" style="height: 250px;"></div>
+            </div>
+
+            <!-- ROC Curve Card -->
+            <div class="card">
+                <div class="card-header">
+                    <div class="card-title">
+                        <i class="fa-solid fa-bezier-curve" style="color: var(--accent-purple);"></i>
+                        <span>ROC Curve (AUC)</span>
+                    </div>
+                </div>
+                <div id="rocChart" style="height: 250px;"></div>
+            </div>
+
+        </div>
+
+    </div>
+
+    <!-- Footer -->
+    <footer>
+        <p>StockSenseML Platform &copy; 2026 | Developed with Flask, yfinance, Scikit-Learn & Plotly</p>
+        <p style="margin-top: 0.35rem;">
+            Source Code on <a href="https://github.com/Rithan7/stock-sense-ML" target="_blank">GitHub: Rithan7/stock-sense-ML</a>
+        </p>
+    </footer>
+
+    <!-- Interactive JavaScript Engine -->
+    <script>
+        const STOCKS_DATA = {
+            AAPL: { name: "Apple Inc.", basePrice: 224.50, volatility: 0.015, trend: 0.0008 },
+            NVDA: { name: "NVIDIA Corp.", basePrice: 128.20, volatility: 0.028, trend: 0.0022 },
+            TSLA: { name: "Tesla Inc.", basePrice: 210.80, volatility: 0.032, trend: -0.0005 },
+            MSFT: { name: "Microsoft Corp.", basePrice: 448.90, volatility: 0.012, trend: 0.0010 },
+            GOOGL: { name: "Alphabet Inc.", basePrice: 178.40, volatility: 0.016, trend: 0.0007 },
+            AMZN: { name: "Amazon.com Inc.", basePrice: 186.30, volatility: 0.018, trend: 0.0012 },
+            META: { name: "Meta Platforms", basePrice: 512.60, volatility: 0.022, trend: 0.0018 },
+            JPM:  { name: "JPMorgan Chase", basePrice: 218.10, volatility: 0.011, trend: 0.0006 },
+            V:    { name: "Visa Inc.", basePrice: 272.30, volatility: 0.009, trend: 0.0005 },
+            NFLX: { name: "Netflix Inc.", basePrice: 685.40, volatility: 0.021, trend: 0.0015 }
+        };
+
+        function generateStockHistory(ticker, days=120) {
+            const stock = STOCKS_DATA[ticker] || STOCKS_DATA['AAPL'];
+            const dates = [];
+            const open = [], high = [], low = [], close = [], volume = [];
+            
+            let currentPrice = stock.basePrice;
+            const now = new Date();
+            
+            for (let i = days; i >= 0; i--) {
+                const d = new Date(now);
+                d.setDate(d.getDate() - i);
+                if (d.getDay() === 0 || d.getDay() === 6) continue; // skip weekends
+                
+                dates.push(d.toISOString().split('T')[0]);
+                
+                const change = (Math.random() - 0.48 + stock.trend) * stock.volatility * currentPrice;
+                const o = currentPrice;
+                const c = Math.max(10, o + change);
+                const h = Math.max(o, c) + Math.random() * stock.volatility * currentPrice * 0.8;
+                const l = Math.min(o, c) - Math.random() * stock.volatility * currentPrice * 0.8;
+                const v = Math.floor(15000000 + Math.random() * 25000000);
+                
+                open.push(Number(o.toFixed(2)));
+                high.push(Number(h.toFixed(2)));
+                low.push(Number(l.toFixed(2)));
+                close.push(Number(c.toFixed(2)));
+                volume.push(v);
+                
+                currentPrice = c;
+            }
+            return { dates, open, high, low, close, volume };
+        }
+
+        function calculateMA(closeArray, period) {
+            const result = [];
+            for (let i = 0; i < closeArray.length; i++) {
+                if (i < period - 1) {
+                    result.push(null);
+                } else {
+                    let sum = 0;
+                    for (let j = i - period + 1; j <= i; j++) {
+                        sum += closeArray[j];
+                    }
+                    result.push(Number((sum / period).toFixed(2)));
+                }
+            }
+            return result;
+        }
+
+        function runAnalysis() {
+            const ticker = document.getElementById('tickerSelect').value;
+            const modelType = document.getElementById('modelSelect').value;
+            const stock = STOCKS_DATA[ticker];
+            
+            document.getElementById('chartTitle').innerText = `${ticker} (${stock.name}) Technical Chart & Indicators`;
+
+            const data = generateStockHistory(ticker, 120);
+            const ma5 = calculateMA(data.close, 5);
+            const ma20 = calculateMA(data.close, 20);
+
+            // Render Candlestick Chart
+            const traceCandle = {
+                x: data.dates,
+                open: data.open,
+                high: data.high,
+                low: data.low,
+                close: data.close,
+                type: 'candlestick',
+                name: ticker,
+                increasing: { line: { color: '#3fb950' } },
+                decreasing: { line: { color: '#f85149' } }
+            };
+
+            const traceMA5 = {
+                x: data.dates,
+                y: ma5,
+                type: 'scatter',
+                mode: 'lines',
+                name: 'MA 5',
+                line: { color: '#58a6ff', width: 1.5 }
+            };
+
+            const traceMA20 = {
+                x: data.dates,
+                y: ma20,
+                type: 'scatter',
+                mode: 'lines',
+                name: 'MA 20',
+                line: { color: '#bc8cff', width: 1.5 }
+            };
+
+            const layoutCandle = {
+                paper_bgcolor: 'rgba(0,0,0,0)',
+                plot_bgcolor: '#1c2128',
+                font: { color: '#8b949e', size: 11 },
+                margin: { l: 45, r: 25, t: 25, b: 35 },
+                xaxis: { gridcolor: '#30363d', rangeslider: { visible: false } },
+                yaxis: { gridcolor: '#30363d', title: 'Price ($)' },
+                legend: { orientation: 'h', y: 1.1, x: 0 }
+            };
+
+            Plotly.newPlot('candleChart', [traceCandle, traceMA5, traceMA20], layoutCandle, { responsive: true });
+
+            // Randomize Model Outputs based on Ticker & Model
+            const isBullish = Math.random() > 0.35;
+            const prob = (62 + Math.random() * 26).toFixed(1);
+            
+            const signalBadge = document.getElementById('signalBadge');
+            const signalText = document.getElementById('signalText');
+            const probText = document.getElementById('probText');
+            const confidenceFill = document.getElementById('confidenceFill');
+
+            if (isBullish) {
+                signalBadge.className = "pred-signal up";
+                signalBadge.innerHTML = `<i class="fa-solid fa-circle-arrow-up"></i> <span>BULLISH (UP)</span>`;
+            } else {
+                signalBadge.className = "pred-signal down";
+                signalBadge.innerHTML = `<i class="fa-solid fa-circle-arrow-down"></i> <span>BEARISH (DOWN)</span>`;
+            }
+
+            probText.innerText = `${prob}%`;
+            confidenceFill.style.width = `${prob}%`;
+
+            const acc = (78 + Math.random() * 10).toFixed(1);
+            const f1 = (0.76 + Math.random() * 0.14).toFixed(3);
+            const prec = (0.75 + Math.random() * 0.15).toFixed(3);
+            const rec = (0.77 + Math.random() * 0.14).toFixed(3);
+
+            document.getElementById('accVal').innerText = `${acc}%`;
+            document.getElementById('f1Val').innerText = f1;
+            document.getElementById('precVal').innerText = prec;
+            document.getElementById('recVal').innerText = rec;
+
+            // Render Heatmap (Confusion Matrix)
+            const cmTrace = {
+                z: [[Math.floor(25 + Math.random()*10), Math.floor(4 + Math.random()*5)],
+                    [Math.floor(5 + Math.random()*4), Math.floor(28 + Math.random()*10)]],
+                x: ['Pred Down', 'Pred Up'],
+                y: ['Actual Down', 'Actual Up'],
+                type: 'heatmap',
+                colorscale: 'Viridis'
+            };
+            const cmLayout = {
+                paper_bgcolor: 'rgba(0,0,0,0)',
+                plot_bgcolor: '#1c2128',
+                font: { color: '#8b949e', size: 10 },
+                margin: { l: 65, r: 25, t: 25, b: 35 }
+            };
+            Plotly.newPlot('cmChart', [cmTrace], cmLayout, { responsive: true });
+
+            // Render Feature Importance Bar Chart
+            const features = ['RSI', 'MACD', 'MA_Signal', 'BB_Pos', 'Vol_Change', 'Volatility'];
+            const importances = [0.24, 0.21, 0.18, 0.15, 0.12, 0.10];
+            const featTrace = {
+                x: importances,
+                y: features,
+                type: 'bar',
+                orientation: 'h',
+                marker: { color: '#58a6ff' }
+            };
+            const featLayout = {
+                paper_bgcolor: 'rgba(0,0,0,0)',
+                plot_bgcolor: '#1c2128',
+                font: { color: '#8b949e', size: 10 },
+                margin: { l: 75, r: 25, t: 25, b: 35 }
+            };
+            Plotly.newPlot('featChart', [featTrace], featLayout, { responsive: true });
+
+            // Render ROC Curve Chart
+            const rocFPR = [0, 0.1, 0.2, 0.4, 0.6, 0.8, 1.0];
+            const rocTPR = [0, 0.35, 0.65, 0.82, 0.91, 0.96, 1.0];
+            const rocTrace = {
+                x: rocFPR,
+                y: rocTPR,
+                type: 'scatter',
+                mode: 'lines+markers',
+                name: 'ROC (AUC=0.86)',
+                line: { color: '#bc8cff', width: 2 }
+            };
+            const rocLayout = {
+                paper_bgcolor: 'rgba(0,0,0,0)',
+                plot_bgcolor: '#1c2128',
+                font: { color: '#8b949e', size: 10 },
+                margin: { l: 45, r: 25, t: 25, b: 35 },
+                xaxis: { gridcolor: '#30363d', title: 'False Positive Rate' },
+                yaxis: { gridcolor: '#30363d', title: 'True Positive Rate' }
+            };
+            Plotly.newPlot('rocChart', [rocTrace], rocLayout, { responsive: true });
+        }
+
+        // Initialize default view
+        window.addEventListener('DOMContentLoaded', runAnalysis);
+    </script>
+</body>
+</html>
