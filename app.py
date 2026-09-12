@@ -21,7 +21,7 @@ import plotly.utils
 from sklearn.linear_model import LogisticRegression
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.model_selection import train_test_split
-from sklearn.metrics import confusion_matrix, accuracy_score, roc_curve, auc, f1_score
+from sklearn.metrics import confusion_matrix, accuracy_score, roc_curve, auc, f1_score, balanced_accuracy_score
 from sklearn.preprocessing import StandardScaler
 
 from models import db, User, Prediction, Watchlist
@@ -135,20 +135,38 @@ def build_features(df):
 
 def train_model(model_type, Xtr, Xte, y_train, y_test):
     if model_type == "rf":
-        m = RandomForestClassifier(n_estimators=100, random_state=42, class_weight="balanced")
+        m = RandomForestClassifier(
+            n_estimators=150,
+            max_depth=5,
+            min_samples_split=10,
+            min_samples_leaf=5,
+            random_state=42,
+            class_weight="balanced"
+        )
     else:
-        m = LogisticRegression(random_state=42, max_iter=1000, class_weight="balanced")
+        m = LogisticRegression(
+            C=0.5,
+            random_state=42,
+            max_iter=1000,
+            class_weight="balanced"
+        )
     m.fit(Xtr, y_train)
+
+    # Calibrate decision threshold on training set using balanced accuracy to avoid test leakage
+    y_tr_prob = np.array(m.predict_proba(Xtr)[:, 1], dtype=np.float64)
+    y_tr_true = np.array(y_train, dtype=np.int32)
+    
+    best_t = 0.5
+    best_score = -1.0
+    for t in np.linspace(0.35, 0.65, 31):
+        pred_tr = (y_tr_prob >= t).astype(int)
+        score = float(balanced_accuracy_score(y_tr_true, pred_tr))
+        if score > best_score:
+            best_score = score
+            best_t = float(t)
+
     yp = np.array(m.predict_proba(Xte)[:, 1], dtype=np.float64)
     yt = np.array(y_test, dtype=np.int32)
-
-    best_t = 0.5
-    best_f = 0.0
-    for t in [i / 100 for i in range(5, 96)]:
-        f = f1_score(yt, (yp >= t).astype(int), zero_division=0)
-        if f > best_f:
-            best_f = f
-            best_t = t
     ypred = (yp >= best_t).astype(int)
 
     acc = float(accuracy_score(yt, ypred))
@@ -158,7 +176,7 @@ def train_model(model_type, Xtr, Xte, y_train, y_test):
     tn, fp, fn, tp = [int(x) for x in cm.ravel()]
     prec = tp / (tp + fp) if tp + fp > 0 else 0.0
     rec  = tp / (tp + fn) if tp + fn > 0 else 0.0
-    f1v  = 2 * prec * rec / (prec + rec) if prec + rec > 0 else 0.0
+    f1v  = float(f1_score(yt, ypred, average="macro", zero_division=0))
     return m, yp, yt, acc, ra, f1v, best_t, fpr, tpr, cm, tn, fp, fn, tp, prec, rec
 
 
@@ -824,4 +842,5 @@ def run_model():
 
 
 if __name__ == "__main__":
-    app.run(debug=True, port=5000)
+    port = int(os.getenv("PORT", 5001))
+    app.run(debug=True, port=port)
