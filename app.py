@@ -21,7 +21,7 @@ import plotly.utils
 from sklearn.linear_model import LogisticRegression
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.model_selection import train_test_split
-from sklearn.metrics import confusion_matrix, accuracy_score, roc_curve, auc, f1_score
+from sklearn.metrics import confusion_matrix, accuracy_score, roc_curve, auc, f1_score, balanced_accuracy_score
 from sklearn.preprocessing import StandardScaler
 
 from models import db, User, Prediction, Watchlist
@@ -135,20 +135,38 @@ def build_features(df):
 
 def train_model(model_type, Xtr, Xte, y_train, y_test):
     if model_type == "rf":
-        m = RandomForestClassifier(n_estimators=100, random_state=42, class_weight="balanced")
+        m = RandomForestClassifier(
+            n_estimators=150,
+            max_depth=5,
+            min_samples_split=10,
+            min_samples_leaf=5,
+            random_state=42,
+            class_weight="balanced"
+        )
     else:
-        m = LogisticRegression(random_state=42, max_iter=1000, class_weight="balanced")
+        m = LogisticRegression(
+            C=0.5,
+            random_state=42,
+            max_iter=1000,
+            class_weight="balanced"
+        )
     m.fit(Xtr, y_train)
+
+    # Calibrate decision threshold on training set using balanced accuracy to avoid test leakage
+    y_tr_prob = np.array(m.predict_proba(Xtr)[:, 1], dtype=np.float64)
+    y_tr_true = np.array(y_train, dtype=np.int32)
+    
+    best_t = 0.5
+    best_score = -1.0
+    for t in np.linspace(0.35, 0.65, 31):
+        pred_tr = (y_tr_prob >= t).astype(int)
+        score = float(balanced_accuracy_score(y_tr_true, pred_tr))
+        if score > best_score:
+            best_score = score
+            best_t = float(t)
+
     yp = np.array(m.predict_proba(Xte)[:, 1], dtype=np.float64)
     yt = np.array(y_test, dtype=np.int32)
-
-    best_t = 0.5
-    best_f = 0.0
-    for t in [i / 100 for i in range(5, 96)]:
-        f = f1_score(yt, (yp >= t).astype(int), zero_division=0)
-        if f > best_f:
-            best_f = f
-            best_t = t
     ypred = (yp >= best_t).astype(int)
 
     acc = float(accuracy_score(yt, ypred))
@@ -158,7 +176,7 @@ def train_model(model_type, Xtr, Xte, y_train, y_test):
     tn, fp, fn, tp = [int(x) for x in cm.ravel()]
     prec = tp / (tp + fp) if tp + fp > 0 else 0.0
     rec  = tp / (tp + fn) if tp + fn > 0 else 0.0
-    f1v  = 2 * prec * rec / (prec + rec) if prec + rec > 0 else 0.0
+    f1v  = float(f1_score(yt, ypred, average="macro", zero_division=0))
     return m, yp, yt, acc, ra, f1v, best_t, fpr, tpr, cm, tn, fp, fn, tp, prec, rec
 
 
@@ -503,7 +521,6 @@ def api_stockinfo(ticker):
 # ── ML Route ───────────────────────────────────────────────────────────────
 
 @app.route("/run", methods=["POST"])
-@login_required
 def run_model():
     try:
         p          = request.get_json(force=True)
@@ -612,6 +629,9 @@ def run_model():
 
         pu   = float(m.predict_proba(sc.transform(sdf[FEATURES].iloc[[-1]]))[0][1])
         pdir = "UP" if pu >= best_t else "DOWN"
+        prob_up_pct   = round(pu * 100, 1)
+        prob_down_pct = round((1.0 - pu) * 100, 1)
+        target_prob   = prob_up_pct if pdir == "UP" else prob_down_pct
 
         if model_type == "rf":
             coefs = np.array(m.feature_importances_, dtype=np.float64)
@@ -777,16 +797,20 @@ def run_model():
         # Fetch news (Feature 3)
         news = fetch_news(ticker, 5)
 
-        # Save to DB
-        pred_record = Prediction(
-            user_id=current_user.id, ticker=ticker,
-            model_type="Random Forest" if model_type == "rf" else "Logistic Regression",
-            accuracy=round(acc * 100, 1), auc=round(ra, 3),
-            f1=round(f1v * 100, 1), prediction_direction=pdir,
-            prob_up=round(pu * 100, 1),
-        )
-        db.session.add(pred_record)
-        db.session.commit()
+        # Save to DB if user is authenticated
+        if current_user.is_authenticated:
+            try:
+                pred_record = Prediction(
+                    user_id=current_user.id, ticker=ticker,
+                    model_type="Random Forest" if model_type == "rf" else "Logistic Regression",
+                    accuracy=round(acc * 100, 1), auc=round(ra, 3),
+                    f1=round(f1v * 100, 1), prediction_direction=pdir,
+                    prob_up=prob_up_pct,
+                )
+                db.session.add(pred_record)
+                db.session.commit()
+            except Exception:
+                db.session.rollback()
 
         return jsonify({
             "metrics": {
@@ -794,13 +818,19 @@ def run_model():
                 "auc":         round(ra, 3),
                 "gini":        round(gc, 3),
                 "gini_label":  gini_label,
-                "f1":          round(f1v * 100, 1),
+                "f1":          round(f1v, 3),
+                "f1_pct":      round(f1v * 100, 1),
+                "precision":   round(prec, 3),
+                "recall":      round(rec, 3),
                 "specificity": round(spec * 100, 1),
                 "threshold":   round(best_t, 2),
                 "hl_p":        round(hl_p, 4),
                 "hl_ok":       bool(hl_p > 0.05),
-                "prob_up":     round(pu * 100, 1),
+                "prob_up":     prob_up_pct,
+                "prob_down":   prob_down_pct,
+                "probability": target_prob,
                 "prediction":  pdir,
+                "signal_text": "BULLISH (UP)" if pdir == "UP" else "BEARISH (DOWN)",
                 "confidence":  round(max(pu, 1 - pu) * 100, 1),
                 "ticker":      ticker,
                 "company":     STOCKS.get(ticker, ticker),
@@ -824,4 +854,5 @@ def run_model():
 
 
 if __name__ == "__main__":
-    app.run(debug=True, port=5000)
+    port = int(os.getenv("PORT", 5001))
+    app.run(debug=True, port=port)

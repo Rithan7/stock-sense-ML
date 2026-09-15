@@ -575,12 +575,6 @@ function stopProgress(){
 
 // ── Run Model ──────────────────────────────────────────────────────────────
 async function runModel(){
-  {% if not current_user.is_authenticated %}
-  alert("Please log in to run the model.");
-  window.location.href="/login";
-  return;
-  {% endif %}
-
   const ticker    = document.getElementById("sel-ticker").value;
   const startYear = document.getElementById("sel-year").value;
   const testSize  = document.getElementById("sel-test").value;
@@ -650,13 +644,14 @@ function animateValue(el, target, duration, isFloat, suffix){
 function renderMetrics(m){
   const gCol = m.gini>=0.2?"#56d364":m.gini>=0?"#e3b341":"#f85149";
   const aCol = m.accuracy>=60?"#56d364":m.accuracy>=52?"#e3b341":"#f85149";
+  const f1Display = m.f1_pct !== undefined ? m.f1_pct : (m.f1 <= 1 ? m.f1 * 100 : m.f1);
   const defs = [
     {label:"Accuracy",    val:m.accuracy,            color:aCol,       sub:m.model_name,        suffix:"%", float:false},
     {label:"AUC Score",   val:m.auc,                 color:"#4fc3f7",  sub:"ROC area",           suffix:"",  float:true},
-    {label:"Gini",        val:Math.abs(m.gini)*100,  color:gCol,       sub:m.gini_label,         suffix:"%", float:false},
-    {label:"F1 Score",    val:m.f1,                  color:"#bc8cff",  sub:"Harmonic mean",      suffix:"%", float:false},
-    {label:"Specificity", val:m.specificity,         color:"#56d364",  sub:"True negative rate", suffix:"%", float:false},
-    {label:"Threshold",   val:null,                  color:"#e3b341",  sub:"Optimal cutoff",     suffix:"",  float:false, fixed:m.threshold},
+    {label:"F1 Score",    val:f1Display,             color:"#bc8cff",  sub:"Harmonic mean",      suffix:"%", float:false},
+    {label:"Precision",   val:m.precision !== undefined ? m.precision : 0, color:"#58a6ff", sub:"Pos. Predictive", suffix:"", float:true},
+    {label:"Recall",      val:m.recall !== undefined ? m.recall : 0, color:"#e3b341", sub:"Sensitivity", suffix:"", float:true},
+    {label:"Specificity", val:m.specificity,         color:"#56d364",  sub:"True neg. rate",     suffix:"%", float:false},
   ];
   document.getElementById("metrics-row").innerHTML = defs.map((d,i)=>`
     <div class="metric-card" style="transition-delay:${i*60}ms">
@@ -677,20 +672,56 @@ function renderMetrics(m){
 function renderBanner(m){
   const isUp  = m.prediction==="UP";
   const color = isUp?"#56d364":"#f85149";
-  const icon  = isUp?"📈":"📉";
+  const icon  = isUp?"▲":"▼";
   const b     = document.getElementById("pred-banner");
   b.style.borderColor = color;
+  const targetProb = m.probability !== undefined ? m.probability : (isUp ? m.prob_up : m.prob_down);
+  const grad = isUp ? "linear-gradient(90deg, var(--blue), var(--green))" : "linear-gradient(90deg, var(--blue), var(--red))";
+  const actionText = isUp
+    ? "Expected to Close HIGHER tomorrow (Price Gain)"
+    : "Expected to Close LOWER tomorrow (Price Drop)";
+
   b.innerHTML = `
-    <div class="pred-banner-left">
-      <span style="font-size:13px;color:var(--muted);">Tomorrow's prediction for</span>
-      <span style="font-size:14px;font-weight:700;color:var(--white);">${m.ticker}</span>
-      <span style="font-size:12px;color:var(--muted);">(${m.company}) —</span>
-      <span style="font-size:22px;font-weight:800;color:${color};font-family:'Space Mono',monospace;">${icon} ${m.prediction}</span>
+    <div style="display:flex;flex-direction:column;gap:8px;flex:1;min-width:320px;">
+      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+        <span style="font-size:11px;color:var(--blue);text-transform:uppercase;letter-spacing:0.08em;font-weight:700;">
+          🔮 Next Trading Day Price Direction Forecast
+        </span>
+        <span style="font-size:11px;color:var(--muted);">
+          (Target: Tomorrow's Close vs. Today's Close)
+        </span>
+      </div>
+      <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;">
+        <span style="font-size:24px;font-weight:800;color:${color};font-family:'Space Mono',monospace;display:inline-flex;align-items:center;gap:8px;">
+          ${icon} ${isUp ? "BULLISH (UP)" : "BEARISH (DOWN)"}
+        </span>
+        <span style="font-size:14px;color:var(--white);font-weight:600;">
+          Direction Probability: <strong style="color:${color};font-size:20px;font-family:'Space Mono',monospace;">${targetProb.toFixed(1)}%</strong>
+        </span>
+      </div>
+      <div style="font-size:12px;color:var(--muted);">
+        Forecast: <strong style="color:var(--white);">${m.ticker}</strong> is <span style="color:${color};font-weight:600;">${actionText}</span> based on 14 technical indicators.
+      </div>
+      <div style="background:var(--card2);height:8px;border-radius:6px;overflow:hidden;width:100%;max-width:440px;border:1px solid var(--border);margin-top:2px;">
+        <div style="height:100%;width:${Math.min(100, Math.max(10, targetProb))}%;background:${grad};border-radius:6px;transition:width 0.6s ease;"></div>
+      </div>
+      <div style="display:flex;gap:10px;font-size:11px;font-family:'Space Mono',monospace;margin-top:2px;flex-wrap:wrap;">
+        <span style="background:rgba(86,211,100,0.12);color:var(--green);padding:3px 8px;border-radius:4px;border:1px solid rgba(86,211,100,0.25);">
+          P(Stock Moves UP): ${m.prob_up}%
+        </span>
+        <span style="background:rgba(248,81,73,0.12);color:var(--red);padding:3px 8px;border-radius:4px;border:1px solid rgba(248,81,73,0.25);">
+          P(Stock Moves DOWN): ${m.prob_down}%
+        </span>
+        <span style="background:rgba(79,195,247,0.12);color:var(--blue);padding:3px 8px;border-radius:4px;border:1px solid rgba(79,195,247,0.25);">
+          Model Confidence: ${m.confidence}%
+        </span>
+      </div>
     </div>
-    <div class="pred-details">
-      P(UP) = ${m.prob_up}% &nbsp;·&nbsp; Confidence = ${m.confidence}%<br>
-      Threshold = ${m.threshold} &nbsp;·&nbsp; Split = ${m.split_date}<br>
-      Train: ${m.train_rows} days &nbsp;·&nbsp; Test: ${m.test_rows} days
+    <div class="pred-details" style="align-self:center;">
+      <strong style="color:var(--white);font-size:13px;">${m.ticker}</strong> (${m.company}) &nbsp;·&nbsp; Algorithm: <strong style="color:var(--white);">${m.model_name}</strong><br>
+      Precision: <strong style="color:var(--white);">${m.precision !== undefined ? m.precision : 'N/A'}</strong> &nbsp;·&nbsp; Recall: <strong style="color:var(--white);">${m.recall !== undefined ? m.recall : 'N/A'}</strong><br>
+      Decision Cutoff: ${m.threshold} &nbsp;·&nbsp; Test Split Date: ${m.split_date}<br>
+      Training History: ${m.train_rows} days &nbsp;·&nbsp; Testing Period: ${m.test_rows} days
     </div>`;
 }
 
