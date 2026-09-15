@@ -1457,11 +1457,13 @@
       const defs = [
         { label: "Accuracy", val: m.accuracy, color: aCol, sub: m.model_name, suffix: "%", float: false },
         { label: "AUC Score", val: m.auc, color: "#4fc3f7", sub: "ROC area", suffix: "", float: true },
+        { label: "Gini", val: Math.abs(m.gini) * 100, color: gCol, sub: m.gini_label, suffix: "%", float: false },
         { label: "Forecast Prob.", val: targetProb, color: probColor, sub: `P(${m.prediction || 'UP'})`, suffix: "%", float: false },
         { label: "F1 Score", val: f1Display, color: "#bc8cff", sub: "Harmonic mean", suffix: "%", float: false },
         { label: "Precision", val: m.precision !== undefined ? m.precision : 0, color: "#58a6ff", sub: "Pos. Predictive", suffix: "", float: true },
         { label: "Recall", val: m.recall !== undefined ? m.recall : 0, color: "#e3b341", sub: "Sensitivity", suffix: "", float: true },
         { label: "Specificity", val: m.specificity, color: "#56d364", sub: "True neg. rate", suffix: "%", float: false },
+        { label: "Threshold", val: null, color: "#e3b341", sub: "Optimal cutoff", suffix: "", float: false, fixed: m.threshold },
       ];
       document.getElementById("metrics-row").innerHTML = defs.map((d, i) => `
         <div class="metric-card" style="transition-delay:${i * 60}ms">
@@ -1541,26 +1543,6 @@
           Model Confidence: ${m.confidence}%
         </span>
       </div>
-    &nbsp;→&nbsp; ${stable
-          ? "✅ Consistent across time windows — the single-split metrics above look trustworthy."
-          : "⚠️ High variance across folds — the single-split metrics above may not generalize; treat them cautiously."}`;
-      box.style.display = "block";
-    }
-
-    // ── Render Banner ──────────────────────────────────────────────────────────
-    function renderBanner(m) {
-      const isUp = m.prediction === "UP";
-      const color = isUp ? "#56d364" : "#f85149";
-      const icon = isUp ? "📈" : "📉";
-      const b = document.getElementById("pred-banner");
-      b.style.borderColor = color;
-      b.innerHTML = `
-    <div class="pred-banner-left">
-      <span style="font-size:13px;color:var(--muted);">Tomorrow's prediction for</span>
-      <span style="font-size:14px;font-weight:700;color:var(--white);">${m.ticker}</span>
-      <span style="font-size:12px;color:var(--muted);">(${m.company}) —</span>
-      <span style="font-size:22px;font-weight:800;color:${color};font-family:'Space Mono',monospace;">${icon} ${m.prediction}</span>
->>>>>>> origin/main
     </div>
     <div class="pred-details" style="align-self:center;">
       <strong style="color:var(--white);font-size:13px;">${m.ticker}</strong> (${m.company}) &nbsp;·&nbsp; Algorithm: <strong style="color:var(--white);">${m.model_name}</strong><br>
