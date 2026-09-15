@@ -1,5 +1,6 @@
 # 📈 Stock Market Classifier & Analytics Platform (`StockSenseML`)
 
+[![Live Demo](https://img.shields.io/badge/🚀_Live_Demo-Click_Here-brightgreen?style=for-the-badge&logo=vercel&logoColor=white)](https://rithan7.github.io/stock-sense-ML/)
 [![GitHub Repository](https://img.shields.io/badge/GitHub-Repository-181717?style=for-the-badge&logo=github&logoColor=white)](https://github.com/Rithan7/stock-sense-ML)
 [![Python](https://img.shields.io/badge/Python-3.9%2B-3776AB?style=for-the-badge&logo=python&logoColor=white)](https://www.python.org/)
 [![Flask](https://img.shields.io/badge/Flask-3.0.0-000000?style=for-the-badge&logo=flask&logoColor=white)](https://flask.palletsprojects.com/)
@@ -7,17 +8,27 @@
 [![Plotly](https://img.shields.io/badge/Plotly-5.18.0-3F4F75?style=for-the-badge&logo=plotly&logoColor=white)](https://plotly.com/)
 [![License](https://img.shields.io/badge/License-MIT-green?style=for-the-badge)](LICENSE)
 
-An end-to-end Machine Learning web application built with **Flask**, **yfinance**, **Scikit-Learn**, and **Plotly** to predict stock market directional movement (Up vs. Down) using 14 quantitative technical indicators, rigorous feature engineering, and interactive analytics dashboards.
+An end-to-end Machine Learning web application built with **Flask**, **yfinance**, **Scikit-Learn**, and **Plotly** to predict stock market directional movement (Up vs. Down) using 14+ technical indicators, quantitative feature engineering, and interactive analytics dashboards.
+
+---
+
+## 🌐 Live Demo
+
+Experience the live interactive application directly in your web browser:
+
+👉 **[Launch StockSenseML Live Demo](https://rithan7.github.io/stock-sense-ML/)**
+
+> **Note**: You can test stock directional predictions for major tickers like **AAPL**, **NVDA**, **TSLA**, **MSFT**, and **GOOGL**, experiment with Random Forest vs. Logistic Regression models, inspect confusion matrices and ROC curves, and search custom tickers live!
 
 ---
 
 ## ✨ Features & Capabilities
 
-- 🔍 **Real-Time Market Data Ingestion**: Integration with `yfinance` to fetch OHLCV (Open, High, Low, Close, Volume) historical prices.
-- 📊 **14 Quantitative Technical Indicators**:
-  - **Moving Averages**: 5-day (MA5), 10-day (MA10), 20-day (MA20), and MA Crossover Trend Signals.
+- 🔍 **Real-Time Market Data Ingestion**: Seamless integration with `yfinance` to fetch OHLCV (Open, High, Low, Close, Volume) stock price history.
+- 📊 **14+ Quantitative Technical Indicators**:
+  - **Moving Averages**: 5-day (MA5), 10-day (MA10), 20-day (MA20), and MA Crossover Signals.
   - **Momentum & Trend**: Relative Strength Index (RSI 14), Moving Average Convergence Divergence (MACD & Signal Line), 5-day Price Momentum.
-  - **Volatility & Bands**: Bollinger Bands Width & Relative Position, Historical 5-day Return Volatility, Normalized Price Range.
+  - **Volatility & Bands**: Bollinger Bands Width & Relative Position, Historical 5-day Volatility, Normalized Price Range.
 - 🤖 **Dual Machine Learning Classification Algorithms**:
   - **Random Forest Classifier**: Non-linear ensemble model with 100 decision trees and automated Gini feature importance extraction.
   - **Logistic Regression**: Probabilistic linear classifier standardized with `StandardScaler`.
@@ -49,7 +60,8 @@ flowchart LR
     G --> H[Render Interactive Dashboard]
 ```
 
-### Key Application Screens:
+### Key Application Screens
+
 1. **Prediction Dashboard (`/`)**: Main workbench to select tickers, select algorithms, trigger model training, and view performance metrics & Plotly charts.
 2. **Stock Search (`/search`)**: Dedicated real-time lookup tool to inspect technical indicators, prices, and technical signals for any custom stock symbol.
 3. **Prediction History (`/history`)**: User dashboard displaying saved predictions, probability outputs, F1 score logs, and stock watchlist.
@@ -70,92 +82,87 @@ flowchart LR
 
 ---
 
-## 🔬 Mathematical Feature Engineering & Quantitative Modeling
+## 🔬 Mathematical Feature Engineering
 
-The core predictive architecture processes raw daily OHLCV price series $\{P_t, H_t, L_t, O_t, V_t\}$ to construct 14 quantitative features and 1 binary classification target.
+The prediction engine computes 14 distinct quantitative features for binary classification, where the target is defined as:
 
-### 1. Binary Target Formulation ($Y_t$)
-The predictive task is framed as next-session directional class estimation:
-$$Y_t = \mathbb{I}(P_{t+1} > P_t) = \begin{cases} 1, & \text{if } P_{t+1} > P_t \quad (\text{Up / Bullish}) \\ 0, & \text{if } P_{t+1} \le P_t \quad (\text{Down / Bearish}) \end{cases}$$
-where $P_t$ denotes the adjusted closing price at daily index $t$, and $\mathbb{I}(\cdot)$ is the indicator function.
+$$
+Y_t = 1 \text{ if } \text{Close}_{t+1} > \text{Close}_t, \text{ else } 0
+$$
 
----
+### 1. Simple Moving Averages
 
-### 2. Complete Technical Feature Definitions
+Unweighted rolling mean over lookback windows $N \in \{5, 10, 20\}$:
 
-#### 1. Daily Percentage Return ($R_t$)
-Quantifies single-period relative price gain or loss:
-$$R_t = \frac{P_t - P_{t-1}}{P_{t-1}}$$
+$$
+\text{MA}_{N,t} = \frac{1}{N} \sum_{i=0}^{N-1} P_{t-i}
+$$
 
-#### 2. Simple Moving Averages ($\text{MA}_{N,t}$)
-Computes unweighted rolling mean over lookback windows $N \in \{5, 10, 20\}$:
-$$\text{MA}_{N,t} = \frac{1}{N} \sum_{i=0}^{N-1} P_{t-i}$$
+### 2. Moving Average Trend Signal
 
-#### 3. Moving Average Trend Signal ($\text{MA\_Signal}_t$)
-Normalizes short-term (5-day) versus medium-term (10-day) trend alignment relative to current asset price:
-$$\text{MA\_Signal}_t = \frac{\text{MA}_{5,t} - \text{MA}_{10,t}}{P_t}$$
+Normalizes short-term (5-day) versus medium-term (10-day) trend alignment relative to current price:
 
-#### 4. Percentage Volume Variation ($\text{Vol\_Change}_t$)
-Measures day-over-day trading volume acceleration:
-$$\text{Vol\_Change}_t = \frac{V_t - V_{t-1}}{V_{t-1}}$$
+$$
+\text{MA\_Signal}_t = \frac{\text{MA}_{5,t} - \text{MA}_{10,t}}{P_t}
+$$
 
-#### 5. Return Volatility ($\sigma_{5,t}$)
-Calculates rolling 5-day sample standard deviation of percentage returns:
-$$\sigma_{5,t} = \sqrt{\frac{1}{4} \sum_{i=0}^{4} (R_{t-i} - \bar{R}_{5,t})^2}, \quad \text{where } \bar{R}_{5,t} = \frac{1}{5}\sum_{i=0}^{4} R_{t-i}$$
+### 3. Percentage Volume Variation
 
-#### 6. Normalized Intraday Price Range ($\text{Price\_Range}_t$)
-Scales intraday high-to-low dispersion relative to closing price:
-$$\text{Price\_Range}_t = \frac{H_t - L_t}{P_t}$$
+Day-over-day trading volume acceleration:
 
-#### 7. Absolute Price Momentum ($\text{Momentum}_{5,t}$)
-Tracks 5-session directional price displacement:
-$$\text{Momentum}_{5,t} = P_t - P_{t-5}$$
+$$
+\text{Vol\_Change}_t = \frac{V_t - V_{t-1}}{V_{t-1}}
+$$
 
-#### 8. Relative Strength Index ($\text{RSI}_{14,t}$)
-Measures momentum velocity and magnitude over a 14-day window:
-$$\Delta P_t = P_t - P_{t-1}$$
-$$\text{Gain}_t = \max(\Delta P_t, 0), \quad \text{Loss}_t = \max(-\Delta P_t, 0)$$
-$$\overline{\text{Gain}}_{14,t} = \frac{1}{14} \sum_{i=0}^{13} \text{Gain}_{t-i}, \quad \overline{\text{Loss}}_{14,t} = \frac{1}{14} \sum_{i=0}^{13} \text{Loss}_{t-i}$$
-$$\text{RS}_{14,t} = \frac{\overline{\text{Gain}}_{14,t}}{\overline{\text{Loss}}_{14,t} + \varepsilon}$$
-$$\text{RSI}_{14,t} = 100 - \left( \frac{100}{1 + \text{RS}_{14,t}} \right)$$
+### 4. Return Volatility
 
-#### 9. Moving Average Convergence Divergence ($\text{MACD}_t$ & $\text{MACD\_Signal}_t$)
-Calculates Exponential Moving Averages (EMA) with smoothing multiplier $\alpha_N = \frac{2}{N+1}$:
-$$\text{EMA}_{N,t} = \alpha_N P_t + (1 - \alpha_N)\text{EMA}_{N,t-1}$$
-$$\text{MACD}_t = \text{EMA}_{12,t} - \text{EMA}_{26,t}$$
-$$\text{MACD\_Signal}_t = \text{EMA}_{9}(\text{MACD})_t$$
+Rolling 5-day sample standard deviation of percentage returns:
 
-#### 10. Bollinger Bands Bandwidth ($\text{BB\_Width}_t$)
-Quantifies price volatility expansion and compression relative to the 20-day baseline $\mu_{20,t}$ and standard deviation $\sigma_{20,t}$:
-$$\text{Upper Band}_t = \mu_{20,t} + 2\sigma_{20,t}, \quad \text{Lower Band}_t = \mu_{20,t} - 2\sigma_{20,t}$$
-$$\text{BB\_Width}_t = \frac{\text{Upper Band}_t - \text{Lower Band}_t}{\mu_{20,t}} = \frac{4\sigma_{20,t}}{\mu_{20,t}}$$
+$$
+\sigma_{5,t} = \sqrt{\frac{1}{4} \sum_{i=0}^{4} \left(R_{t-i} - \bar{R}_{5,t}\right)^2}
+\qquad \text{where} \qquad
+\bar{R}_{5,t} = \frac{1}{5}\sum_{i=0}^{4} R_{t-i}
+$$
 
-#### 11. Bollinger Bands %B Relative Position ($\text{BB\_Pos}_t$)
-Measures closing price location relative to lower and upper Bollinger envelopes:
-$$\text{BB\_Pos}_t = \frac{P_t - \text{Lower Band}_t}{\text{Upper Band}_t - \text{Lower Band}_t + \varepsilon} = \frac{P_t - (\mu_{20,t} - 2\sigma_{20,t})}{4\sigma_{20,t} + \varepsilon}$$
+### 5. Relative Strength Index (RSI 14)
 
----
+$$
+\text{RSI} = 100 - \left( \frac{100}{1 + \dfrac{\text{EMA}(\text{Gain}, 14)}{\text{EMA}(\text{Loss}, 14)}} \right)
+$$
 
-### 3. Data Standardization & Model Optimization
+### 6. MACD Indicator
 
-#### Feature Standardization ($\mathbf{z}$)
-To eliminate scale variance between indicators (e.g., RSI $\in [0, 100]$ vs. Returns $\in [-0.1, 0.1]$), features are zero-mean unit-variance transformed:
-$$z_{i,j} = \frac{x_{i,j} - \mu_j}{\sigma_j}$$
-where mean $\mu_j$ and standard deviation $\sigma_j$ are fitted strictly on training observations to prevent data leakage.
+$$
+\text{MACD} = \text{EMA}(\text{Close}, 12) - \text{EMA}(\text{Close}, 26)
+$$
 
-#### Decision Threshold Tuning ($t^*$)
-Instead of using a static decision boundary $p=0.5$, optimal classification thresholds $t \in [0.05, 0.95]$ are grid-searched to maximize the $F_1$-score on test predictions:
-$$t^* = \underset{t \in [0.05, 0.95]}{\operatorname{argmax}} \; F_1(t) = \underset{t \in [0.05, 0.95]}{\operatorname{argmax}} \left( \frac{2 \cdot \text{Precision}(t) \cdot \text{Recall}(t)}{\text{Precision}(t) + \text{Recall}(t)} \right)$$
+$$
+\text{MACD\_Signal} = \text{EMA}(\text{MACD}, 9)
+$$
+
+### 7. Bollinger Bands Position
+
+$$
+\text{BB\_Pos} = \frac{\text{Close} - (\text{MA}_{20} - 2\sigma)}{4\sigma + 10^{-9}}
+$$
+
+### 8. Normalized Price Range
+
+$$
+\text{Price Range} = \frac{\text{High} - \text{Low}}{\text{Close}}
+$$
 
 ---
 
 ## 🚀 Quick Start Guide
 
 ### Prerequisites
+
 - **Python 3.9+** installed on your system.
 - `git` version control tool.
 
 ### 1. Clone the Repository
+
 ```bash
 git clone https://github.com/Rithan7/stock-sense-ML.git
 cd stock-sense-ML
@@ -176,21 +183,27 @@ source venv/bin/activate
 ```
 
 ### 3. Install Dependencies
+
 ```bash
 pip install -r requirements.txt
 ```
 
 ### 4. Configure Environment Variables
+
 Copy `.env.example` to `.env`:
+
 ```bash
 cp .env.example .env
 ```
+
 *(Optional)* Customize `SECRET_KEY` and `DATABASE_URL` inside `.env`.
 
 ### 5. Run the Application Locally
+
 ```bash
 python app.py
 ```
+
 Open your browser and navigate to: **`http://127.0.0.1:5000`**
 
 ---
@@ -206,10 +219,10 @@ stock-sense-ML/
 ├── .gitignore            # Git tracking exclusion rules
 └── templates/            # HTML Jinja2 frontend templates
     ├── index.html        # Main interactive prediction workbench & Plotly dashboard
-    ├── search.html       # Stock ticker search & live technical analytics view
-    ├── history.html      # Saved prediction history & user watchlist manager
-    ├── login.html        # User login template
-    └── register.html     # User registration template
+    ├── search.html        # Stock ticker search & live technical analytics view
+    ├── history.html       # Saved prediction history & user watchlist manager
+    ├── login.html         # User login template
+    └── register.html      # User registration template
 ```
 
 ---
@@ -217,6 +230,7 @@ stock-sense-ML/
 ## 🤝 Contributing
 
 Contributions, feature suggestions, and bug reports are welcome!
+
 1. Fork the project repository.
 2. Create your feature branch (`git checkout -b feature/AmazingFeature`).
 3. Commit your changes (`git commit -m 'Add some AmazingFeature'`).

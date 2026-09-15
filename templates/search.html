@@ -4,6 +4,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="csrf-token" content="{{ csrf_token() }}">
   <title>Stock Search & Analytics — StockSenseML</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link
@@ -849,6 +850,12 @@
     let currentTicker = "";
     let currentNews = [];
 
+    // ── CSRF helper ──────────────────────────────────────────────────────
+    function csrfToken() {
+      const m = document.querySelector('meta[name="csrf-token"]');
+      return m ? m.content : "";
+    }
+
     function quickSearch(sym) {
       document.getElementById("search-input").value = sym;
       doSearch();
@@ -1003,7 +1010,7 @@
     async function addToWatchlist(sym) {
       {% if current_user.is_authenticated %}
       try {
-        await fetch("/api/watchlist", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ticker: sym }) });
+        await fetch("/api/watchlist", { method: "POST", headers: { "Content-Type": "application/json", "X-CSRFToken": csrfToken() }, body: JSON.stringify({ ticker: sym }) });
         alert(`${sym} added to your Watchlist! ⭐`);
       } catch (e) { alert("Failed to add."); }
       {% else %}

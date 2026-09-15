@@ -9,6 +9,7 @@ warnings.filterwarnings("ignore")
 from flask import Flask, render_template, request, jsonify, redirect, url_for, flash
 from flask_login import LoginManager, login_user, logout_user, login_required, current_user
 from flask_bcrypt import Bcrypt
+from flask_wtf import CSRFProtect
 from dotenv import load_dotenv
 
 import pandas as pd
@@ -20,7 +21,7 @@ import plotly.utils
 
 from sklearn.linear_model import LogisticRegression
 from sklearn.ensemble import RandomForestClassifier
-from sklearn.model_selection import train_test_split
+from sklearn.model_selection import train_test_split, TimeSeriesSplit
 from sklearn.metrics import confusion_matrix, accuracy_score, roc_curve, auc, f1_score, balanced_accuracy_score
 from sklearn.preprocessing import StandardScaler
 
@@ -35,6 +36,7 @@ app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 
 db.init_app(app)
 bcrypt        = Bcrypt(app)
+csrf          = CSRFProtect(app)
 login_manager = LoginManager(app)
 login_manager.login_view = "login"
 
@@ -93,22 +95,29 @@ def build_features(df):
             d[c] = pd.to_numeric(d[c], errors="coerce")
     
     if "Volume" in d.columns:
-        d["Volume"] = d["Volume"].replace(0, np.nan).ffill().bfill().fillna(1.0)
+        # Note: only forward-fill. bfill() was pulling future values backward
+        # into early rows, which is a (small) look-ahead leak.
+        d["Volume"] = d["Volume"].replace(0, np.nan).ffill().fillna(1.0)
     d.dropna(subset=["Close", "High", "Low", "Volume"], inplace=True)
 
     d["Return"]      = d["Close"].pct_change()
-    d["MA5"]         = d["Close"].rolling(5).mean()
-    d["MA10"]        = d["Close"].rolling(10).mean()
-    d["MA20"]        = d["Close"].rolling(20).mean()
+    # MA5/MA10/MA20/Momentum are expressed as a ratio to Close rather than
+    # raw price, so they stay stationary across years/tickers instead of
+    # just tracking whatever price level the stock happens to be at.
+    d["MA5"]         = d["Close"].rolling(5).mean()  / d["Close"].replace(0, np.nan) - 1
+    d["MA10"]        = d["Close"].rolling(10).mean() / d["Close"].replace(0, np.nan) - 1
+    d["MA20"]        = d["Close"].rolling(20).mean() / d["Close"].replace(0, np.nan) - 1
     d["Vol_Change"]  = d["Volume"].pct_change()
     d["Volatility"]  = d["Return"].rolling(5).std()
     d["Price_Range"] = (d["High"] - d["Low"]) / d["Close"].replace(0, np.nan)
-    d["MA_Signal"]   = (d["MA5"] - d["MA10"]) / d["Close"].replace(0, np.nan)
-    d["Momentum"]    = d["Close"] - d["Close"].shift(5)
+    d["MA_Signal"]   = (d["Close"].rolling(5).mean() - d["Close"].rolling(10).mean()) / d["Close"].replace(0, np.nan)
+    d["Momentum"]    = d["Close"] / d["Close"].shift(5).replace(0, np.nan) - 1
 
     delta = d["Close"].diff()
-    gain  = delta.clip(lower=0).rolling(14).mean()
-    loss  = (-delta.clip(upper=0)).rolling(14).mean()
+    # Wilder's smoothing (alpha=1/14), matching the standard RSI definition
+    # used by most charting platforms, instead of a plain rolling mean.
+    gain  = delta.clip(lower=0).ewm(alpha=1/14, adjust=False, min_periods=14).mean()
+    loss  = (-delta.clip(upper=0)).ewm(alpha=1/14, adjust=False, min_periods=14).mean()
     rs    = gain / loss.replace(0, np.nan)
     d["RSI"] = 100 - (100 / (1 + rs))
 
@@ -122,11 +131,21 @@ def build_features(df):
     d["BB_Width"] = (bb_m + bb_s * 2 - (bb_m - bb_s * 2)) / bb_m.replace(0, np.nan)
     d["BB_Pos"]   = (d["Close"] - (bb_m - bb_s * 2)) / ((bb_s * 4) + 1e-9)
 
-    d["Target"] = (d["Close"].shift(-1) > d["Close"]).astype(int)
+    # IMPORTANT: build Target so the final (unknowable) row is genuinely NaN.
+    # `(NaN > x)` evaluates to False in pandas, so the naive
+    # `(d["Close"].shift(-1) > d["Close"]).astype(int)` used to silently
+    # label the most recent trading day as "DOWN" (0) instead of dropping
+    # it — corrupting one label in every single training run.
+    future_close = d["Close"].shift(-1)
+    d["Target"] = np.where(
+        future_close > d["Close"], 1.0,
+        np.where(future_close < d["Close"], 0.0, np.nan)
+    )
 
     # Clean out infinities and missing values
     d.replace([np.inf, -np.inf], np.nan, inplace=True)
     d.dropna(subset=FEATURES + ["Target"], inplace=True)
+    d["Target"] = d["Target"].astype(int)
 
     for f in FEATURES:
         d[f] = np.clip(d[f], -1e5, 1e5)
@@ -178,6 +197,51 @@ def train_model(model_type, Xtr, Xte, y_train, y_test):
     rec  = tp / (tp + fn) if tp + fn > 0 else 0.0
     f1v  = float(f1_score(yt, ypred, average="macro", zero_division=0))
     return m, yp, yt, acc, ra, f1v, best_t, fpr, tpr, cm, tn, fp, fn, tp, prec, rec
+
+
+def walk_forward_cv(model_type, X, y, n_splits=5):
+    """
+    Evaluate across several chronological folds (expanding window) instead
+    of a single train/test split, so the reported accuracy/F1 isn't just
+    the result of which few months happened to land in the test set.
+    Returns mean/std of balanced accuracy and AUC across folds.
+    """
+    tscv = TimeSeriesSplit(n_splits=n_splits)
+    bal_accs, aucs = [], []
+    for train_idx, test_idx in tscv.split(X):
+        Xtr_raw, Xte_raw = X.iloc[train_idx], X.iloc[test_idx]
+        ytr, yte = y.iloc[train_idx], y.iloc[test_idx]
+        if ytr.nunique() < 2 or yte.nunique() < 2:
+            continue
+
+        sc_cv  = StandardScaler()
+        Xtr_cv = sc_cv.fit_transform(Xtr_raw)
+        Xte_cv = sc_cv.transform(Xte_raw)
+
+        if model_type == "rf":
+            m_cv = RandomForestClassifier(
+                n_estimators=150, max_depth=5, min_samples_split=10,
+                min_samples_leaf=5, random_state=42, class_weight="balanced")
+        else:
+            m_cv = LogisticRegression(
+                C=0.5, random_state=42, max_iter=1000, class_weight="balanced")
+        m_cv.fit(Xtr_cv, ytr)
+
+        proba = m_cv.predict_proba(Xte_cv)[:, 1]
+        preds = (proba >= 0.5).astype(int)
+        bal_accs.append(float(balanced_accuracy_score(yte, preds)))
+        fpr_cv, tpr_cv, _ = roc_curve(yte, proba)
+        aucs.append(float(auc(fpr_cv, tpr_cv)))
+
+    if not bal_accs:
+        return None
+    return {
+        "folds":               len(bal_accs),
+        "balanced_acc_mean":   round(float(np.mean(bal_accs)) * 100, 1),
+        "balanced_acc_std":    round(float(np.std(bal_accs)) * 100, 1),
+        "auc_mean":            round(float(np.mean(aucs)), 3),
+        "auc_std":             round(float(np.std(aucs)), 3),
+    }
 
 
 def fetch_news(ticker, limit=5):
@@ -599,6 +663,10 @@ def run_model():
         m2, yp2, yt2, acc2, ra2, f1v2, best_t2, fpr2, tpr2, cm2, tn2, fp2, fn2, tp2, prec2, rec2 = train_model(
             other_type, Xtr, Xte, y_train, y_test)
 
+        # Walk-forward validation across several chronological folds, so we
+        # aren't reporting metrics from just one lucky/unlucky test window.
+        cv_result = walk_forward_cv(model_type, X, y, n_splits=5)
+
         comparison = {
             model_type: {
                 "accuracy": round(acc * 100, 1),
@@ -840,6 +908,7 @@ def run_model():
                 "total_days":  int(len(sdf)),
                 "split_date":  split_date,
             },
+            "cv":         cv_result,
             "wald":       wald,
             "comparison": comparison,
             "news":       news,
@@ -854,5 +923,6 @@ def run_model():
 
 
 if __name__ == "__main__":
-    port = int(os.getenv("PORT", 5001))
-    app.run(debug=True, port=port)
+    port  = int(os.getenv("PORT", 5001))
+    debug = os.getenv("FLASK_DEBUG", "true").lower() == "true"
+    app.run(debug=debug, port=port)
