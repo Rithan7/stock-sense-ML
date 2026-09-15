@@ -749,9 +749,14 @@ def run_model():
             increasing=dict(line=dict(color="#56d364"), fillcolor="rgba(86,211,100,0.3)"),
             decreasing=dict(line=dict(color="#f85149"), fillcolor="rgba(248,81,73,0.3)"),
         ))
+        ma_prices = {
+            "MA5":  sdf["Close"] * (1.0 + sdf["MA5"]),
+            "MA10": sdf["Close"] * (1.0 + sdf["MA10"]),
+            "MA20": sdf["Close"] * (1.0 + sdf["MA20"]),
+        }
         for col, color, lbl in [("MA5","#4fc3f7","MA5"),("MA10","#e3b341","MA10"),("MA20","#bc8cff","MA20")]:
             c1.add_trace(go.Scatter(
-                x=rx, y=list(sdf[col].astype(float)),
+                x=rx, y=list(ma_prices[col].astype(float)),
                 line=dict(color=color, width=1.4), name=lbl, opacity=0.9))
         c1.add_trace(go.Scatter(
             x=[split_date, split_date], y=[price_min, price_max],
