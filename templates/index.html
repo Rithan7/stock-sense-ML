@@ -1452,9 +1452,12 @@
       const gCol = m.gini >= 0.2 ? "#56d364" : m.gini >= 0 ? "#e3b341" : "#f85149";
       const aCol = m.accuracy >= 60 ? "#56d364" : m.accuracy >= 52 ? "#e3b341" : "#f85149";
       const f1Display = m.f1_pct !== undefined ? m.f1_pct : (m.f1 <= 1 ? m.f1 * 100 : m.f1);
+      const targetProb = m.probability !== undefined ? m.probability : (m.prediction === "UP" ? m.prob_up : m.prob_down);
+      const probColor = m.prediction === "UP" ? "#56d364" : "#f85149";
       const defs = [
         { label: "Accuracy", val: m.accuracy, color: aCol, sub: m.model_name, suffix: "%", float: false },
         { label: "AUC Score", val: m.auc, color: "#4fc3f7", sub: "ROC area", suffix: "", float: true },
+        { label: "Forecast Prob.", val: targetProb, color: probColor, sub: `P(${m.prediction || 'UP'})`, suffix: "%", float: false },
         { label: "F1 Score", val: f1Display, color: "#bc8cff", sub: "Harmonic mean", suffix: "%", float: false },
         { label: "Precision", val: m.precision !== undefined ? m.precision : 0, color: "#58a6ff", sub: "Pos. Predictive", suffix: "", float: true },
         { label: "Recall", val: m.recall !== undefined ? m.recall : 0, color: "#e3b341", sub: "Sensitivity", suffix: "", float: true },
